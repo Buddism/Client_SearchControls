@@ -8,7 +8,20 @@ if(!isObject(OptRemapListSearchText))
 		extent = "257 18";
 	};
 
+	%checkbox = new GuiCheckBoxCtrl(OptRemapListSearchCheckBox)
+	{
+		position = "6 388";
+		variable = "$Pref::SearchControls::SearchOnlyKeybinds";
+		command = "OptRemapList_Search();";
+
+		text = "Search Only Keybinds";
+
+		extent = "257 18";
+	};
+
+
 	OptControlsPane.add(%text);
+	OptControlsPane.add(%checkbox);
 }
 
 function OptRemapListSearchText::onWake(%this, %b, %c, %d, %e, %f)
@@ -19,17 +32,27 @@ function OptRemapListSearchText::onWake(%this, %b, %c, %d, %e, %f)
 	parent::onWake(%this, %b, %c, %d, %e, %f);
 }
 
-
 function OptRemapList_Search()
 {
 	%remapList = nameToID(OptRemapList);
 	%string = OptRemapListSearchText.getValue();
-	
-	if(%string $= "")
+	%stringLength = strlen(%string);
+
+	if(%stringLength == 0)
 	{
 		OptRemapList.fillList();
 		return;
 	}
+
+	%searchOnlyKeybinds = getSubStr(%string, 0, 1) $= "=";
+	if(%searchOnlyKeybinds)
+	{
+		%string = getSubStr(%string, 1, 256);
+		%stringLength--;
+	}
+
+	if(!%searchOnlyKeybinds)
+		%searchOnlyKeybinds = $Pref::SearchControls::SearchOnlyKeybinds;
 
 	%remapList.clear ();
 	for(%i = 0; %i < $RemapCount; %i++)
@@ -39,7 +62,9 @@ function OptRemapList_Search()
 		{
 			%curDivName = %divName;
 			%curDivNeedlePos = stripos(%divName, %string);
-			if(%curDivNeedlePos != -1)
+
+			//does the divName( category ) contain the string
+			if(!%searchOnlyKeybinds && %curDivNeedlePos != -1)
 			{
 				%displayDivision = true;
 
@@ -47,8 +72,8 @@ function OptRemapList_Search()
 				while(%curDivNeedlePos != -1)
 				{
 					%prefix   = getSubStr(%curDivName, 0, %curDivNeedlePos);
-					%infix = getSubStr(%curDivName, %curDivNeedlePos, strlen(%string));
-					%suffix   = getSubStr(%curDivName, %curDivNeedlePos + strlen(%string), 256);
+					%infix = getSubStr(%curDivName, %curDivNeedlePos, %stringLength);
+					%suffix   = getSubStr(%curDivName, %curDivNeedlePos + %stringLength, 256);
 
 					%curDivName =  %prefix @ "\c5/" @ %infix @ "/\c4" @ %suffix;
 
@@ -61,10 +86,17 @@ function OptRemapList_Search()
 			%hasDisplayedDiv = false;
 		}
 		%displayString = buildFullMapString (%i);
-		%needlePosition = stripos(%displayString, %string);
+		if(%searchOnlyKeybinds)
+		{
+			%needlePosition = stripos(getField(%displayString, 1), %string);
+			if(%needlePosition != -1)
+				%needlePosition = strlen(getField(%displayString, 0)) + %needlePosition + 1;
+
+		} else %needlePosition = stripos(%displayString, %string);
 
 		if(%displayDivision || %needlePosition != -1)
 		{
+			//have we shown the division yet?
 			if(!%hasDisplayedDiv)
 			{
 				if(%hasDisplayedOneDiv)
@@ -77,13 +109,14 @@ function OptRemapList_Search()
 				%hasDisplayedOneDiv = true;
 			}
 
+			//does this map display string contain %string
 			while(%needlePosition != -1)
 			{
 				%prefix   = getSubStr(%displayString, 0, %needlePosition);
 				//ripped out the google for this bad boy: infix
-				%infix = getSubStr(%displayString, %needlePosition, strlen(%string));
+				%infix = getSubStr(%displayString, %needlePosition, %stringLength);
 
-				%suffix   = getSubStr(%displayString, %needlePosition + strlen(%string), 256);
+				%suffix   = getSubStr(%displayString, %needlePosition + %stringLength, 256);
 
 				%colorTypeHighlight = (%needlePosition < stripos(%displayString, "\t") ? "\c5" : "\c4");
 
@@ -99,7 +132,3 @@ function OptRemapList_Search()
 		}
 	}
 }
-
-
-
-
